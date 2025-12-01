@@ -4,7 +4,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# อ่าน DATABASE_URL จาก Environment Variable
 # เช่นบน Cloud จะตั้งประมาณ:
 # postgresql://user:password@host:5432/inventory_db
 DATABASE_URL = os.getenv("postgresql://inventory_db_kypm_user:ny2sJD9A9UfV9Px1tOPU55HkE3ph86LH@dpg-d4lbiqeuk2gs738ablng-a.singapore-postgres.render.com/inventory_db_kypm")
