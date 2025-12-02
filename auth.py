@@ -30,7 +30,7 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # -------- helpers --------
 def hash_password(raw: str) -> str:
-    return pbkdf2_sha256.hash(raw))
+    return pbkdf2_sha256.hash(raw)
 
 def verify_password(raw: str, hashed: str) -> bool:
     return pbkdf2_sha256.verify(raw, hashed)
