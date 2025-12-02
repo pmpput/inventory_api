@@ -4,7 +4,7 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.orm import Session
 from database import get_db
 from models import User, UserBranchRole, Branch, BranchRoleEnum, UserGlobalRole
-from passlib.hash import bcrypt_sha256
+from passlib.hash import pbkdf2_sha256
 from pydantic import BaseModel
 import jwt, os
 from datetime import datetime, timedelta, timezone
@@ -30,10 +30,10 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
 
 # -------- helpers --------
 def hash_password(raw: str) -> str:
-    return bcrypt_sha256.hash(raw)
+    return pbkdf2_sha256.hash(raw))
 
 def verify_password(raw: str, hashed: str) -> bool:
-    return bcrypt_sha256.verify(raw, hashed)
+    return pbkdf2_sha256.verify(raw, hashed)
 
 def create_access_token(data: dict, expires_minutes: int = ACCESS_TOKEN_EXPIRE_MINUTES) -> str:
     to_encode = data.copy()
