@@ -26,6 +26,7 @@ class ProductBase(BaseModel):
     category: Optional[str] = None
     image_url: Optional[str] = None
     branch_id: int      # ต้องส่งมาเสมอ
+    unit: Optional[str] = None 
 
 class ProductCreate(ProductBase): pass
 
@@ -36,6 +37,7 @@ class ProductUpdate(BaseModel):
     category: Optional[str] = None
     image_url: Optional[str] = None
     branch_id: Optional[int] = None
+    unit: Optional[str] = None 
 
 class Product(ProductBase):
     id: int
