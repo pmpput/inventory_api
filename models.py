@@ -39,6 +39,7 @@ class Product(Base):
     branch = relationship("Branch", back_populates="products")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    unit = Column(String(50), nullable=True)
 
 Index("ix_products_name_category_branch", Product.name, Product.category, Product.branch_id)
 
