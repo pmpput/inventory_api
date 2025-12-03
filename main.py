@@ -5,6 +5,9 @@ from sqlalchemy.orm import Session
 from typing import List
 import os, shutil
 import json
+import cloudinary
+import cloudinary.uploader
+
 
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -23,6 +26,10 @@ from auth import router as auth_router  # << นำ router เข้ามา
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Inventory API")
+
+cloudinary.config(
+    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME")
+)
 
 app.include_router(auth_router)  # << เพิ่มบรรทัดนี้
 
@@ -68,11 +75,26 @@ UPLOAD_DIR = "static/images"
 # --------------- Upload image ---------------
 @app.post("/upload/")
 async def upload_image(file: UploadFile = File(...)):
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
-    filepath = os.path.join(UPLOAD_DIR, file.filename)
-    with open(filepath, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-    return {"image_url": f"/{filepath}"}
+    # ตรวจว่าเป็นรูปคร่าว ๆ
+    if not file.content_type.startswith("image/"):
+        raise HTTPException(status_code=400, detail="File must be an image")
+
+    try:
+        # อัปโหลดขึ้น Cloudinary (ไปอยู่ในโฟลเดอร์ inventory)
+        result = cloudinary.uploader.upload(
+            file.file,          # ใช้ stream จาก UploadFile
+            folder="inventory", # ชื่อโฟลเดอร์ใน Cloudinary จะรวมรูปไว้ด้วยกัน
+            resource_type="image",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Upload failed: {e}")
+
+    image_url = result.get("secure_url")
+    if not image_url:
+        raise HTTPException(status_code=500, detail="No image url returned from Cloudinary")
+
+    # ส่ง URL ถาวรกลับไปให้ Flutter
+    return {"image_url": image_url}
 
 # ---------- Branches ----------
 @app.get("/branches/", response_model=List[schemas.Branch])
