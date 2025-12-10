@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Query
+from fastapi import APIRouter,FastAPI, Depends, HTTPException, UploadFile, File, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
@@ -7,7 +7,6 @@ import os, shutil
 import json
 import cloudinary
 import cloudinary.uploader
-
 
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -22,6 +21,7 @@ from auth import create_access_token, verify_password
 from schemas import LoginRequest, Token, UserCreate
 from auth import router as auth_router  # << นำ router เข้ามา
 from firebase_utils import send_inventory_notification 
+from models import Branch
 
 # ----- สร้างตารางเมื่อรันครั้งแรก (ถ้ายังไม่มี) -----
 # Base.metadata.create_all(bind=engine)
@@ -31,8 +31,9 @@ app = FastAPI(title="Inventory API")
 cloudinary.config(
     cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME")
 )
-
+router = APIRouter(prefix="/branches", tags=["Branches"])
 app.include_router(auth_router)  # << เพิ่มบรรทัดนี้
+app.include_router(router)
 
 # ----- เปิด CORS (ช่วงพัฒนาให้ * ไปก่อน ถ้าโปรดักชันควรระบุโดเมน) -----
 
@@ -98,6 +99,24 @@ def create_branch(
 ):
     return crud.create_branch(db, branch)
 
+@router.patch("/{branch_id}/set_location")
+
+@app.get("/branches/{branch_id}/location")
+def get_branch_location(branch_id: int, db: Session = Depends(get_db)):
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    return {
+        "id": branch.id,
+        "name": branch.name,
+        "latitude": branch.latitude,
+        "longitude": branch.longitude,
+        "address": branch.address
+    }
+
+
 @app.put("/branches/{branch_id}", response_model=schemas.Branch)
 def update_branch(
     branch_id: int,
@@ -109,6 +128,7 @@ def update_branch(
     if not obj:
         raise HTTPException(status_code=404, detail="Branch not found")
     return obj
+
 
 @app.delete("/branches/{branch_id}", status_code=204)
 def delete_branch(

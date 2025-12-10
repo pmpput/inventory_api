@@ -24,6 +24,9 @@ class Branch(Base):
     name = Column(String(255), nullable=False, unique=True, index=True)
     location = Column(String(255), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    latitude = Column(Float, nullable=True)
+    longitude = Column(Float, nullable=True)
+    address = Column(String(500), nullable=True)
 
     products = relationship("Product", back_populates="branch", cascade="all, delete-orphan")
 
