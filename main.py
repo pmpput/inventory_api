@@ -21,9 +21,10 @@ from models import BranchRoleEnum as BranchRole, UserGlobalRole as GlobalRole, U
 from auth import create_access_token, verify_password
 from schemas import LoginRequest, Token, UserCreate
 from auth import router as auth_router  # << นำ router เข้ามา
+from firebase_utils import send_inventory_notification 
 
 # ----- สร้างตารางเมื่อรันครั้งแรก (ถ้ายังไม่มี) -----
-Base.metadata.create_all(bind=engine)
+# Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Inventory API")
 
@@ -32,23 +33,6 @@ cloudinary.config(
 )
 
 app.include_router(auth_router)  # << เพิ่มบรรทัดนี้
-
-# ✅ initialize Firebase (ทำครั้งเดียว)
-if not firebase_admin._apps:
-    firebase_json = os.getenv("FIREBASE_CREDENTIALS")
-
-    if firebase_json:
-        # Running on Cloud — รับ JSON จาก ENV
-        cred_dict = json.loads(firebase_json)
-        cred = credentials.Certificate(cred_dict)
-        firebase_admin.initialize_app(cred)
-    else:
-        # Running on local (Mac) — ใช้ไฟล์ปกติ
-        if os.path.exists("serviceAccountKey.json"):
-            cred = credentials.Certificate("serviceAccountKey.json")
-            firebase_admin.initialize_app(cred)
-        else:
-            print("⚠️ Firebase not initialized (no key found)")
 
 # ----- เปิด CORS (ช่วงพัฒนาให้ * ไปก่อน ถ้าโปรดักชันควรระบุโดเมน) -----
 
@@ -200,13 +184,6 @@ def read_product(
 
 
 # --------------- Update ---------------
-#@app.put("/products/{product_id}", response_model=schemas.Product)
-#def update_product(product_id: int, patch: schemas.ProductUpdate, db: Session = Depends(get_db)):
-#    obj = crud.update_product(db, product_id, patch)
-#    if not obj:
-#        raise HTTPException(status_code=404, detail="Product not found")
-#    return obj
-
 @app.put("/products/{product_id}", response_model=schemas.Product)
 def update_product(
     product_id: int,
@@ -218,15 +195,16 @@ def update_product(
     if not current:
         raise HTTPException(status_code=404, detail="Product not found")
 
-    # Owner: ฟรี
+    # Owner: แก้ได้ทุก field
     if user.global_role == GlobalRole.OWNER:
         updated = crud.update_product(db, product_id, patch)
     else:
         # ต้องเป็นสมาชิกสาขานี้
         require_branch_member(current.branch_id)(db=db, user=user)
-        # เช็คบทบาทจริงในสาขา
+
         ur = db.query(UserBranchRole).filter_by(
-            user_id=user.id, branch_id=current.branch_id
+            user_id=user.id,
+            branch_id=current.branch_id,
         ).first()
         if not ur:
             raise HTTPException(403, "Not a member of this branch")
@@ -234,7 +212,7 @@ def update_product(
         if ur.role == BranchRole.MANAGER:
             updated = crud.update_product(db, product_id, patch)
         else:
-            # STAFF: อนุญาตเฉพาะ quantity
+            # STAFF: อัปเดตได้เฉพาะ quantity
             if patch.quantity is None or any([
                 patch.name is not None,
                 patch.price is not None,
@@ -243,12 +221,16 @@ def update_product(
                 patch.branch_id is not None,
             ]):
                 raise HTTPException(403, "Staff can only update quantity")
-            updated = crud.update_product(db, product_id, schemas.ProductUpdate(quantity=patch.quantity))
 
-    # ==== แจ้งเตือน FCM ตามโค้ดเดิมของคุณ ====
+            updated = crud.update_product(
+                db, product_id, schemas.ProductUpdate(quantity=patch.quantity)
+            )
+
+    # ==== แจ้งเตือน FCM แบบใช้ helper ====
     if patch.quantity is not None:
         title = None
         body = None
+
         if patch.quantity == 0:
             title = "สินค้าหมดสต็อก"
             body = f"{updated.name} หมดแล้วในสาขา ID {updated.branch_id}"
@@ -257,18 +239,9 @@ def update_product(
             body = f"{updated.name} เหลือเพียง {patch.quantity} ชิ้น"
 
         if title:
-            try:
-                message = messaging.Message(
-                    notification=messaging.Notification(title=title, body=body),
-                    topic="inventory_alerts",
-                )
-                messaging.send(message)
-                print(f"📢 ส่งแจ้งเตือนแล้ว: {title} - {body}")
-            except Exception as e:
-                print(f"❌ แจ้งเตือนล้มเหลว: {e}")
+            send_inventory_notification(title, body)
 
     return updated
-
 
 
 # --------------- Delete ---------------
@@ -290,28 +263,3 @@ def delete_product(
     require_branch_member(obj.branch_id, min_role=BranchRole.MANAGER)(db=db, user=user)
     ok = crud.delete_product(db, product_id)
     return {"deleted": ok, "id": product_id}
-
-
-# เพิ่ม roles
-# from fastapi import Body
-# from sqlalchemy.orm import Session
-# from fastapi import Depends
-# from models import User
-# from database import get_db
-
-@app.post("/auth/login", response_model=Token)
-def login(data: LoginRequest, db: Session = Depends(get_db)):
-    user = db.query(User).filter(User.username == data.username).first()
-    if not user or not verify_password(data.password, user.password_hash):
-        raise HTTPException(status_code=401, detail="Incorrect username or password")
-
-    # ฝัง role และ optional branch-roles ไว้ใน claims เพื่อใช้ที่ Flutter
-    # (ถ้าต้องการประหยัด payload ก็ฝังเฉพาะ global_role/username แล้วไป query เพิ่มภายหลัง)
-    token = create_access_token({
-        "sub": user.username,
-        "uid": user.id,
-        "global_role": user.global_role.value,
-        "branch_id": user.branch_id,
-    })
-    return Token(access_token=token)
-
