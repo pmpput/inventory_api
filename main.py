@@ -99,7 +99,33 @@ def create_branch(
 ):
     return crud.create_branch(db, branch)
 
-@router.patch("/{branch_id}/set_location")
+@app.patch("/branches/{branch_id}/set_location")
+def set_branch_location(
+    branch_id: int,
+    lat: float,
+    lng: float,
+    address: str | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_owner),
+):
+    branch = db.query(Branch).filter(Branch.id == branch_id).first()
+    if not branch:
+        raise HTTPException(status_code=404, detail="Branch not found")
+
+    branch.latitude = lat
+    branch.longitude = lng
+    branch.address = address
+    db.commit()
+    db.refresh(branch)
+
+    return {
+        "id": branch.id,
+        "name": branch.name,
+        "latitude": branch.latitude,
+        "longitude": branch.longitude,
+        "address": branch.address,
+    }
+
 
 @app.get("/branches/{branch_id}/location")
 def get_branch_location(branch_id: int, db: Session = Depends(get_db)):
