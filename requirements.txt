@@ -10,3 +10,5 @@ python-dotenv
 pydantic
 alembic
 cloudinary
+line-bot-sdk
+
