@@ -22,6 +22,8 @@ from schemas import LoginRequest, Token, UserCreate
 from auth import router as auth_router  # << นำ router เข้ามา
 from firebase_utils import send_inventory_notification 
 from models import Branch
+from line_webhook import router as line_router
+
 
 # ----- สร้างตารางเมื่อรันครั้งแรก (ถ้ายังไม่มี) -----
 # Base.metadata.create_all(bind=engine)
@@ -34,6 +36,8 @@ cloudinary.config(
 router = APIRouter(prefix="/branches", tags=["Branches"])
 app.include_router(auth_router)  # << เพิ่มบรรทัดนี้
 app.include_router(router)
+app.include_router(line_router)
+
 
 # ----- เปิด CORS (ช่วงพัฒนาให้ * ไปก่อน ถ้าโปรดักชันควรระบุโดเมน) -----
 
