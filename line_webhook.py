@@ -78,6 +78,18 @@ async def line_webhook(
                     TextSendMessage(text="pong ✅ Inventory system connected")
                 )
 
+            if text == "login" or text == "register":
+               line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(
+            text=(
+                "🔐 เข้าสู่ระบบ Pepino Inventory\n\n"
+                "คลิกที่ลิงก์ด้านล่างเพื่อ Login / Register 👇\n"
+                "https://inventory-web-14d4.onrender.com"
+            )
+        )
+    )    
+
              # ---------- ALL IN STOCK ----------
             elif text == "All in Stock":
                 products = fetch_all_in_stock()
