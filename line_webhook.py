@@ -70,6 +70,7 @@ async def line_webhook(
     for event in events:
         if isinstance(event, MessageEvent) and isinstance(event.message, TextMessage):
             text = event.message.text.strip().lower()
+            print("💬 LINE TEXT:", text)
 
             # test command
             if text == "ping":
@@ -78,7 +79,7 @@ async def line_webhook(
                     TextSendMessage(text="pong ✅ Inventory system connected")
                 )
 
-            if text == "login" or text == "register":
+            elif text == "login" or text == "register":
                line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(
