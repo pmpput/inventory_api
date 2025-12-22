@@ -69,7 +69,7 @@ async def line_webhook(
 
     for event in events:
         if isinstance(event, MessageEvent) and isinstance(event.message, TextMessage):
-            text = event.message.text.strip().lower()
+            text = event.message.text.strip()
             print("💬 LINE TEXT:", text)
 
             # test command
