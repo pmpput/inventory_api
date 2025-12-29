@@ -1,52 +1,49 @@
-# line_products.py
 import os
 import requests
-from fastapi import APIRouter, Request, Header, HTTPException
+from fastapi import FastAPI, Request, Header, HTTPException
 from linebot import LineBotApi, WebhookParser
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import (
-    MessageEvent,
-    TextMessage,
-    TextSendMessage,
-)
+from linebot.models import MessageEvent, TextMessage, TextSendMessage
 
-router = APIRouter()
+app = FastAPI()
 
-# ================== CONFIG ==================
+# ================= CONFIG =================
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET")
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 
-API_BASE = "https://inventory-api-659i.onrender.com"
-LOW_STOCK_THRESHOLD = 5
-
-DEFAULT_BRANCH_ID = 1  # ⭐ ปรับเป็น branch ที่ต้องการ
-
 if not LINE_CHANNEL_SECRET or not LINE_CHANNEL_ACCESS_TOKEN:
-    raise RuntimeError("LINE credentials not set")
+    raise RuntimeError("LINE env not set")
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 parser = WebhookParser(LINE_CHANNEL_SECRET)
 
-# ================== HELPERS ==================
-def fetch_products(branch_id: int):
-    """ดึงสินค้าตามสาขา (ไม่ใช้ auth สำหรับ LINE)"""
-    res = requests.get(
-        f"{API_BASE}/products/",
-        params={"branch_id": branch_id},
-        timeout=10,
-    )
-    res.raise_for_status()
-    return res.json()
+API_BASE = "https://inventory-api-659i.onrender.com"
+
+DEFAULT_BRANCH_ID = 1   # ⭐ สาขาที่ LINE ใช้
+LOW_STOCK = 5
+
+# ================= HELPERS =================
+def fetch_products():
+    try:
+        res = requests.get(
+            f"{API_BASE}/products/",
+            params={"branch_id": DEFAULT_BRANCH_ID},
+            timeout=10,
+        )
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        raise RuntimeError(str(e))
 
 
 def all_in_stock(products):
-    return [p for p in products if (p.get("quantity") or 0) > LOW_STOCK_THRESHOLD]
+    return [p for p in products if (p.get("quantity") or 0) > LOW_STOCK]
 
 
 def low_in_stock(products):
     return [
         p for p in products
-        if 0 < (p.get("quantity") or 0) <= LOW_STOCK_THRESHOLD
+        if 0 < (p.get("quantity") or 0) <= LOW_STOCK
     ]
 
 
@@ -57,14 +54,12 @@ def out_of_stock(products):
 def format_product(p):
     return (
         f"📦 {p.get('name')}\n"
-        f"฿{p.get('price')} • Qty: {p.get('quantity')}\n"
-        f"Unit: {p.get('unit') or '-'} • "
-        f"Category: {p.get('category') or '-'}"
+        f"฿{p.get('price')} • Qty: {p.get('quantity')}"
     )
 
 
-# ================== WEBHOOK ==================
-@router.post("/line/webhook")
+# ================= WEBHOOK =================
+@app.post("/line/webhook")
 async def line_webhook(
     request: Request,
     x_line_signature: str = Header(None),
@@ -77,10 +72,9 @@ async def line_webhook(
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     for event in events:
-        if not (
-            isinstance(event, MessageEvent)
-            and isinstance(event.message, TextMessage)
-        ):
+        if not isinstance(event, MessageEvent):
+            continue
+        if not isinstance(event.message, TextMessage):
             continue
 
         text = event.message.text.strip().lower()
@@ -89,7 +83,7 @@ async def line_webhook(
         if text == "ping":
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text="pong ✅ Inventory system connected"),
+                TextSendMessage(text="pong ✅ inventory connected"),
             )
             continue
 
@@ -99,35 +93,33 @@ async def line_webhook(
                 event.reply_token,
                 TextSendMessage(
                     text=(
-                        "🔐 Pepino Inventory System\n\n"
-                        "Login / Register ได้ที่ 👇\n"
+                        "🔐 Pepino Inventory\n\n"
+                        "Login / Register 👇\n"
                         "https://inventory-web-14d4.onrender.com"
                     )
                 ),
             )
             continue
 
-        # ---------- FETCH PRODUCTS ----------
+        # ---------- FETCH ----------
         try:
-            products = fetch_products(DEFAULT_BRANCH_ID)
+            products = fetch_products()
         except Exception as e:
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text=f"❌ API Error: {e}"),
+                TextSendMessage(text=f"❌ API error\n{e}"),
             )
             continue
 
-        # ---------- ALL IN STOCK ----------
+        # ---------- COMMANDS ----------
         if text == "all in stock":
             items = all_in_stock(products)
             title = "📦 All in Stock"
 
-        # ---------- LOW IN STOCK ----------
         elif text == "low in stock":
             items = low_in_stock(products)
             title = "⚠️ Low in Stock"
 
-        # ---------- OUT OF STOCK ----------
         elif text == "out of stock":
             items = out_of_stock(products)
             title = "⛔ Out of Stock"
@@ -137,11 +129,10 @@ async def line_webhook(
                 event.reply_token,
                 TextSendMessage(
                     text=(
-                        "❓ คำสั่งไม่ถูกต้อง\n\n"
-                        "พิมพ์ได้เฉพาะ:\n"
-                        "- all in stock\n"
-                        "- low in stock\n"
-                        "- out of stock"
+                        "❓ คำสั่งที่ใช้ได้\n\n"
+                        "• all in stock\n"
+                        "• low in stock\n"
+                        "• out of stock"
                     )
                 ),
             )
