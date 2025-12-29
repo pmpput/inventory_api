@@ -1,6 +1,5 @@
-# line_products.py
 import os
-import requests
+import httpx
 from fastapi import APIRouter, Request, Header, HTTPException
 from linebot import LineBotApi, WebhookParser
 from linebot.exceptions import InvalidSignatureError
@@ -18,8 +17,7 @@ LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 
 API_BASE = "https://inventory-api-659i.onrender.com"
 LOW_STOCK_THRESHOLD = 5
-
-DEFAULT_BRANCH_ID = 1  # ⭐ ปรับเป็น branch ที่ต้องการ
+DEFAULT_BRANCH_ID = 1
 
 if not LINE_CHANNEL_SECRET or not LINE_CHANNEL_ACCESS_TOKEN:
     raise RuntimeError("LINE credentials not set")
@@ -28,14 +26,14 @@ line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 parser = WebhookParser(LINE_CHANNEL_SECRET)
 
 # ================== HELPERS ==================
-def fetch_products(branch_id: int):
-    res = requests.get(
-        f"{API_BASE}/line/products",
-        params={"branch_id": branch_id},
-        timeout=20,
-    )
-    res.raise_for_status()
-    return res.json()
+async def fetch_products(branch_id: int):
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        res = await client.get(
+            f"{API_BASE}/line/products",
+            params={"branch_id": branch_id},
+        )
+        res.raise_for_status()
+        return res.json()
 
 
 def all_in_stock(products):
@@ -76,15 +74,14 @@ async def line_webhook(
         raise HTTPException(status_code=400, detail="Invalid signature")
 
     for event in events:
-        if not (
-            isinstance(event, MessageEvent)
-            and isinstance(event.message, TextMessage)
-        ):
+        if not isinstance(event, MessageEvent):
+            continue
+        if not isinstance(event.message, TextMessage):
             continue
 
         text = event.message.text.strip().lower()
 
-        # ---------- TEST ----------
+        # ---------- PING ----------
         if text == "ping":
             line_bot_api.reply_message(
                 event.reply_token,
@@ -108,25 +105,25 @@ async def line_webhook(
 
         # ---------- FETCH PRODUCTS ----------
         try:
-            products = fetch_products(DEFAULT_BRANCH_ID)
-        except Exception as e:
+            products = await fetch_products(DEFAULT_BRANCH_ID)
+        except Exception:
             line_bot_api.reply_message(
                 event.reply_token,
-                TextSendMessage(text=f"❌ API Error: {e}"),
+                TextSendMessage(
+                    text="❌ ไม่สามารถเชื่อมต่อระบบคลังสินค้าได้ กรุณาลองใหม่อีกครั้ง"
+                ),
             )
             continue
 
-        # ---------- ALL IN STOCK ----------
+        # ---------- COMMANDS ----------
         if text == "all in stock":
             items = all_in_stock(products)
             title = "📦 All in Stock"
 
-        # ---------- LOW IN STOCK ----------
         elif text == "low in stock":
             items = low_in_stock(products)
             title = "⚠️ Low in Stock"
 
-        # ---------- OUT OF STOCK ----------
         elif text == "out of stock":
             items = out_of_stock(products)
             title = "⛔ Out of Stock"
@@ -137,7 +134,7 @@ async def line_webhook(
                 TextSendMessage(
                     text=(
                         "❓ คำสั่งไม่ถูกต้อง\n\n"
-                        "พิมพ์ได้เฉพาะ:\n"
+                        "พิมพ์ได้:\n"
                         "- all in stock\n"
                         "- low in stock\n"
                         "- out of stock"
@@ -151,7 +148,7 @@ async def line_webhook(
             reply = f"{title}\nไม่มีสินค้า"
         else:
             reply = f"{title}\n\n" + "\n\n".join(
-                format_product(p) for p in items
+                format_product(p) for p in items[:10]
             )
 
         line_bot_api.reply_message(

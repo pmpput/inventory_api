@@ -38,6 +38,11 @@ app.include_router(auth_router)  # << เพิ่มบรรทัดนี้
 app.include_router(router)
 app.include_router(line_router)
 
+@app.get("/ping")
+def ping():
+    return {"status": "ok"}
+
+
 
 # ----- เปิด CORS (ช่วงพัฒนาให้ * ไปก่อน ถ้าโปรดักชันควรระบุโดเมน) -----
 
