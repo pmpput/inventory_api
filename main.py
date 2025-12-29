@@ -325,22 +325,25 @@ def line_products(
     branch_id: int,
     db: Session = Depends(get_db),
 ):
-    
-    products = crud.get_products(
-        db=db,
-        branch_id=branch_id,
-        skip=0,
-        limit=1000,
-    )
+    try:
+        products = (
+            db.query(models.Product)
+            .filter(models.Product.branch_id == branch_id)
+            .all()
+        )
 
-    return [
-        {
-            "id": p.id,
-            "name": p.name,
-            "price": p.price,
-            "quantity": p.quantity,
-            "unit": p.unit,
-            "category": p.category,
-        }
-        for p in products
-    ]
+        return [
+            {
+                "id": p.id,
+                "name": p.name,
+                "price": p.price,
+                "quantity": p.quantity,
+                "unit": p.unit,
+                "category": p.category,
+            }
+            for p in products
+        ]
+
+    except Exception as e:
+        print("LINE PRODUCTS ERROR:", e)
+        raise HTTPException(status_code=500, detail="LINE products error")
