@@ -29,11 +29,10 @@ parser = WebhookParser(LINE_CHANNEL_SECRET)
 
 # ================== HELPERS ==================
 def fetch_products(branch_id: int):
-    """ดึงสินค้าตามสาขา (ไม่ใช้ auth สำหรับ LINE)"""
     res = requests.get(
-        f"{API_BASE}/products/",
+        f"{API_BASE}/line/products",
         params={"branch_id": branch_id},
-        timeout=10,
+        timeout=20,
     )
     res.raise_for_status()
     return res.json()
