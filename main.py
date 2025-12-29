@@ -313,3 +313,29 @@ def delete_product(
     require_branch_member(obj.branch_id, min_role=BranchRole.MANAGER)(db=db, user=user)
     ok = crud.delete_product(db, product_id)
     return {"deleted": ok, "id": product_id}
+
+# === LINE PUBLIC API ===
+@app.get("/line/products")
+def line_products(
+    branch_id: int,
+    db: Session = Depends(get_db),
+):
+    
+    products = crud.get_products(
+        db=db,
+        branch_id=branch_id,
+        skip=0,
+        limit=1000,
+    )
+
+    return [
+        {
+            "id": p.id,
+            "name": p.name,
+            "price": p.price,
+            "quantity": p.quantity,
+            "unit": p.unit,
+            "category": p.category,
+        }
+        for p in products
+    ]
