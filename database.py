@@ -6,12 +6,13 @@ from sqlalchemy.orm import sessionmaker
 # อ่านจาก ENV ชื่อ DATABASE_URL
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-if not DATABASE_URL:
-    raise RuntimeError("DATABASE_URL is not set in environment variables")
+# if not DATABASE_URL:
+#    raise RuntimeError("DATABASE_URL is not set in environment variables")
 
 engine = create_engine(
     DATABASE_URL,
     pool_pre_ping=True,
+    pool_recycle=300,
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
