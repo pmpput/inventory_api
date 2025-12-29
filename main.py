@@ -7,6 +7,7 @@ import os, shutil
 import json
 import cloudinary
 import cloudinary.uploader
+from models import Product 
 
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -327,8 +328,8 @@ def line_products(
 ):
     try:
         products = (
-            db.query(models.Product)
-            .filter(models.Product.branch_id == branch_id)
+            db.query(Product)
+            .filter(Product.branch_id == branch_id)
             .all()
         )
 
@@ -345,5 +346,5 @@ def line_products(
         ]
 
     except Exception as e:
-        print("LINE PRODUCTS ERROR:", e)
-        raise HTTPException(status_code=500, detail="LINE products error")
+        print("🔥 LINE PRODUCTS ERROR:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
