@@ -35,28 +35,6 @@ async def fetch_products(branch_id: int):
         res.raise_for_status()
         return res.json()
     
-def parse_product_form(text: str) -> dict:
-
-    data = {}
-    for line in text.splitlines():
-        if ":" not in line:
-            continue
-        k, v = line.split(":", 1)
-        data[k.strip()] = v.strip()
-
-    # cast type
-    try:
-        if "price" in data:
-            data["price"] = float(data["price"])
-        if "quantity" in data:
-            data["quantity"] = int(data["quantity"])
-        if "branch_id" in data:
-            data["branch_id"] = int(data["branch_id"])
-    except ValueError:
-        raise ValueError("price / quantity / branch_id ต้องเป็นตัวเลข")
-
-    return data    
-
 
 def all_in_stock(products):
     return [p for p in products if (p.get("quantity") or 0) > LOW_STOCK_THRESHOLD]
@@ -80,6 +58,24 @@ def format_product(p):
         f"Unit: {p.get('unit') or '-'} • "
         f"Category: {p.get('category') or '-'}"
     )
+
+def parse_product_form(text: str) -> dict:
+    
+    product = {}
+
+    for line in text.splitlines():
+        if ":" not in line:
+            continue
+        key, value = line.split(":", 1)
+        key = key.strip().lower()
+        value = value.strip()
+
+        if key in ("price", "quantity", "branch_id"):
+            product[key] = int(value)
+        else:
+            product[key] = value
+
+    return product
 
 
 # ================== WEBHOOK ==================
@@ -125,18 +121,18 @@ async def line_webhook(
             )
             continue
 
-        # ---------- ADD PRODUCT FORM ----------
-        if text == "add product":
+        # ---------- ADD PRODUCT (SHOW FORM) ----------
+        if text in ("add product", "add product line"):
             line_bot_api.reply_message(
                 event.reply_token,
                 TextSendMessage(
                     text=(
                         "📝 เพิ่มสินค้า (กรอกให้ครบ แล้วส่งกลับ)\n\n"
-                        '"name": "",\n'
-                        '"price": ,\n'
-                        '"quantity": ,\n'
-                        '"unit": "",\n'
-                        '"category": "",\n'
+                        "name: \n"
+                        "price: \n"
+                        "quantity: \n"
+                        "unit: \n"
+                        "category: \n"
                         "branch_id: 1"
                     )
                 ),
@@ -144,14 +140,14 @@ async def line_webhook(
             continue
 
         # ---------- SUBMIT PRODUCT FORM ----------
-        if "name:" in text and "price:" in text and "quantity:" in text:
+        if "name:" in raw_text and "price:" in raw_text and "quantity:" in raw_text:
             try:
                 product = parse_product_form(raw_text)
 
                 required = ["name", "price", "quantity", "branch_id"]
                 for r in required:
                     if r not in product:
-                        raise ValueError(f"missing {r}")
+                        raise ValueError(f"missing field: {r}")
 
                 async with httpx.AsyncClient(timeout=10.0) as client:
                     res = await client.post(
