@@ -97,7 +97,8 @@ async def line_webhook(
         if not isinstance(event.message, TextMessage):
             continue
 
-        text = event.message.text.strip().lower()
+        raw_text = event.message.text.strip()
+        text = raw_text.lower()
 
         # ---------- PING ----------
         if text == "ping":
@@ -121,7 +122,7 @@ async def line_webhook(
             )
             continue
 
-        # ---------- ADD PRODUCT (SHOW FORM) ----------
+        # ---------- SHOW ADD PRODUCT FORM ----------
         if text in ("add product", "add product line"):
             line_bot_api.reply_message(
                 event.reply_token,
@@ -140,7 +141,7 @@ async def line_webhook(
             continue
 
         # ---------- SUBMIT PRODUCT FORM ----------
-        if "name:" in raw_text and "price:" in raw_text and "quantity:" in raw_text:
+        if "name:" in text and "price:" in text and "quantity:" in text:
             try:
                 product = parse_product_form(raw_text)
 
@@ -149,25 +150,25 @@ async def line_webhook(
                     if r not in product:
                         raise ValueError(f"missing field: {r}")
 
-                async with httpx.AsyncClient(timeout=10.0) as client:
-                    res = await client.post(
-                        f"{API_BASE}/line/add-product",
-                        json=product,
-                    )
-
-                if res.status_code >= 400:
-                    raise Exception(res.text)
-
+                # ✅ ตอบ LINE ก่อน (สำคัญที่สุด)
                 line_bot_api.reply_message(
                     event.reply_token,
                     TextSendMessage(
                         text=(
-                            "✅ เพิ่มสินค้าเรียบร้อย 🎉\n\n"
+                            "⏳ กำลังเพิ่มสินค้า...\n\n"
                             f"📦 {product['name']}\n"
-                            f"฿{product['price']} • Qty {product['quantity']}"
+                            f"Qty: {product['quantity']}"
                         )
                     ),
                 )
+
+                # ✅ ค่อยยิง API ทีหลัง (ไม่ block LINE)
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    await client.post(
+                        f"{API_BASE}/line/add-product",
+                        json=product,
+                    )
+
             except Exception as e:
                 line_bot_api.reply_message(
                     event.reply_token,
@@ -209,7 +210,8 @@ async def line_webhook(
                         "พิมพ์ได้:\n"
                         "- all in stock\n"
                         "- low in stock\n"
-                        "- out of stock"
+                        "- out of stock\n"
+                        "- add product"
                     )
                 ),
             )
