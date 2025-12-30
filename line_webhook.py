@@ -132,11 +132,11 @@ async def line_webhook(
                 TextSendMessage(
                     text=(
                         "📝 เพิ่มสินค้า (กรอกให้ครบ แล้วส่งกลับ)\n\n"
-                        "name: Coke\n"
-                        "price: 18\n"
-                        "quantity: 100\n"
-                        "unit: ขวด\n"
-                        "category: drink\n"
+                        '"name": "",\n'
+                        '"price": ,\n'
+                        '"quantity": ,\n'
+                        '"unit": "",\n'
+                        '"category": "",\n'
                         "branch_id: 1"
                     )
                 ),
