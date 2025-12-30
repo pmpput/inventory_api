@@ -3,10 +3,10 @@ import httpx
 from fastapi import APIRouter, Request, Header, HTTPException
 from linebot import LineBotApi, WebhookParser
 from linebot.exceptions import InvalidSignatureError
-from linebot.models import (
-    MessageEvent,
-    TextMessage,
-    TextSendMessage,
+from linebot.models import ( 
+    MessageEvent, 
+    TextMessage, 
+    TextSendMessage, 
 )
 
 router = APIRouter()
@@ -34,6 +34,28 @@ async def fetch_products(branch_id: int):
         )
         res.raise_for_status()
         return res.json()
+    
+def parse_product_form(text: str) -> dict:
+
+    data = {}
+    for line in text.splitlines():
+        if ":" not in line:
+            continue
+        k, v = line.split(":", 1)
+        data[k.strip()] = v.strip()
+
+    # cast type
+    try:
+        if "price" in data:
+            data["price"] = float(data["price"])
+        if "quantity" in data:
+            data["quantity"] = int(data["quantity"])
+        if "branch_id" in data:
+            data["branch_id"] = int(data["branch_id"])
+    except ValueError:
+        raise ValueError("price / quantity / branch_id ต้องเป็นตัวเลข")
+
+    return data    
 
 
 def all_in_stock(products):
@@ -101,6 +123,60 @@ async def line_webhook(
                     )
                 ),
             )
+            continue
+
+        # ---------- ADD PRODUCT FORM ----------
+        if text == "add product":
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(
+                    text=(
+                        "📝 เพิ่มสินค้า (กรอกให้ครบ แล้วส่งกลับ)\n\n"
+                        "name: Coke\n"
+                        "price: 18\n"
+                        "quantity: 100\n"
+                        "unit: ขวด\n"
+                        "category: drink\n"
+                        "branch_id: 1"
+                    )
+                ),
+            )
+            continue
+
+        # ---------- SUBMIT PRODUCT FORM ----------
+        if "name:" in text and "price:" in text and "quantity:" in text:
+            try:
+                product = parse_product_form(raw_text)
+
+                required = ["name", "price", "quantity", "branch_id"]
+                for r in required:
+                    if r not in product:
+                        raise ValueError(f"missing {r}")
+
+                async with httpx.AsyncClient(timeout=10.0) as client:
+                    res = await client.post(
+                        f"{API_BASE}/line/add-product",
+                        json=product,
+                    )
+
+                if res.status_code >= 400:
+                    raise Exception(res.text)
+
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(
+                        text=(
+                            "✅ เพิ่มสินค้าเรียบร้อย 🎉\n\n"
+                            f"📦 {product['name']}\n"
+                            f"฿{product['price']} • Qty {product['quantity']}"
+                        )
+                    ),
+                )
+            except Exception as e:
+                line_bot_api.reply_message(
+                    event.reply_token,
+                    TextSendMessage(text=f"❌ เพิ่มสินค้าไม่สำเร็จ\n{e}"),
+                )
             continue
 
         # ---------- FETCH PRODUCTS ----------

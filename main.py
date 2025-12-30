@@ -348,3 +348,11 @@ def line_products(
     except Exception as e:
         print("🔥 LINE PRODUCTS ERROR:", str(e))
         raise HTTPException(status_code=500, detail=str(e))
+    
+@app.post("/line/add-product")
+def line_add_product(data: schemas.ProductCreate, db: Session = Depends(get_db)):
+    product = models.Product(**data.dict())
+    db.add(product)
+    db.commit()
+    db.refresh(product)
+    return {"id": product.id, "name": product.name}    
