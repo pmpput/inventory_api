@@ -8,7 +8,6 @@ import json
 import cloudinary
 import cloudinary.uploader
 from models import Product 
-
 from grocery_api import CompareRequest , process_single_item
 import asyncio
 
@@ -358,20 +357,33 @@ def line_add_product(data: schemas.ProductCreate, db: Session = Depends(get_db))
     db.refresh(product)
     return {"id": product.id, "name": product.name}    
 
+sem = asyncio.Semaphore(2)
+
+async def safe_process(item):
+    async with sem:
+        return await process_single_item(item)
+
 @app.post("/api/compare")
 async def compare_prices(req: CompareRequest):
-    # 1. สร้างรายการงาน (Tasks) โดยใช้ List Comprehension (ตรวจสอบการย่อหน้าบรรทัดนี้)
-    tasks = [process_single_item(item.strip()) for item in req.items if item.strip()]
+    # สร้างรายการงาน (Tasks)
+    tasks = [safe_process(item.strip()) for item in req.items if item.strip()]
     
     if not tasks:
-        return {"status": "success", "message": "No items to compare", "data": []}
-    
-    # 2. รัน Tasks ทั้งหมดขนานกันโดยใช้ asyncio.gather
-    results_nested = await asyncio.gather(*tasks)
-    
-    # 3. รวมผลลัพธ์ (Flatten List) จาก [[...], [...]] เป็น [...]
-    final_results = [item for sublist in results_nested for item in sublist]
-    
+        return {"status": "success", "data": []}
+
+    try:
+        # ใช้ asyncio.wait_for เพื่อป้องกันค้างเกิน 50 วินาที
+        # หากเกินเวลา ระบบจะตัดการทำงานและคืนค่าเท่าที่หาได้
+        results_nested = await asyncio.wait_for(asyncio.gather(*tasks), timeout=55.0)
+        
+        # รวมผลลัพธ์จาก [[...], [...]] เป็น list เดียว [...]
+        final_results = [item for sublist in results_nested for item in sublist]
+        
+    except asyncio.TimeoutError:
+        return {"status": "error", "message": "Request took too long, please try fewer items."}
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
     return {"status": "success", "message": "", "data": final_results}
 
 
