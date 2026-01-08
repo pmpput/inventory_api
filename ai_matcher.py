@@ -40,7 +40,7 @@ class SmartMatcher:
     # ==================================================
     # 🧠 MATCHING LOGIC
     # ==================================================
-    def find_matches(self, user_query: str, threshold=0.15):
+    def find_matches(self, user_query: str, threshold=0.05):
         """
         ค้นหาสินค้าที่ใกล้เคียงที่สุดโดยใช้ TF-IDF 
         ใช้ RAM น้อยกว่า 10MB (เหมาะสำหรับ Render Free)
