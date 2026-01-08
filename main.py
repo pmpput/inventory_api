@@ -50,7 +50,6 @@ origins = [
     "http://localhost:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "https://inventory-api-659i.onrender.com"
     "*"  # ช่วง dev ใส่ * ง่ายสุด (โปรดล็อกให้แคบลงตอนโปรดักชัน)
 ]
 

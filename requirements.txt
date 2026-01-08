@@ -13,7 +13,6 @@ cloudinary
 line-bot-sdk
 pandas
 scikit-learn
-sentence-transformers
 playwright
 beautifulsoup4
 nest-asyncio

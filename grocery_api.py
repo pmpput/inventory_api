@@ -1,14 +1,11 @@
-import sys
 import asyncio
 import os
 import json
 import re
 import pandas as pd
-import uvicorn
-import nest_asyncio
+
 from typing import List, Dict
 
-from fastapi import FastAPI, Request, HTTPException, Header
 from pydantic import BaseModel
 
 
@@ -257,14 +254,14 @@ async def process_single_item(item: str) -> List[dict]:
         print(f"❌ Core Logic Error: {e}")
         return []
 
-@app.post("/api/compare")
-async def compare_prices(req: CompareRequest):
-    final_results = []
-    for item in req.items:
-        item = (item or "").strip()
-        if not item: continue
-        results = await process_single_item(item)
-        final_results.extend(results)
-    return {"status": "success", "message": "", "data": final_results}
+# @app.post("/api/compare")
+# async def compare_prices(req: CompareRequest):
+#     final_results = []
+#     for item in req.items:
+#         item = (item or "").strip()
+#         if not item: continue
+#         results = await process_single_item(item)
+#         final_results.extend(results)
+#     return {"status": "success", "message": "", "data": final_results}
 # if __name__ == "__main__":
 #     uvicorn.run(app, host="0.0.0.0", port=8000)
