@@ -614,5 +614,4 @@ async def compare_prices(req: CompareRequest):
         final_results.extend(results)
     return {"status": "success", "message": "", "data": final_results}
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))  # ใช้พอร์ตจากตัวแปรสภาพแวดล้อม $PORT ถ้ามี ถ้าไม่มีให้ใช้พอร์ต 8000
-    uvicorn.run(app, host="0.0.0.0", port=port)
+    uvicorn.run(app, host="0.0.0.0", port=8000)
