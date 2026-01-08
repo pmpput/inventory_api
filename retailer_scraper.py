@@ -186,6 +186,7 @@ async def scrape_search(retailer_name: str, search_url_template: str, query: str
     if not q_raw: return []
     q_encoded = quote(q_raw, safe="")
     
+    # เลือก URL ตามภาษา
     if retailer_name.lower() == "bigc":
         has_thai = any("\u0E00" <= ch <= "\u0E7F" for ch in q_raw)
         url = f"https://www.bigc.co.th/th/search?q={q_encoded}" if has_thai else f"https://www.bigc.co.th/en/search?q={q_encoded}"
@@ -197,25 +198,40 @@ async def scrape_search(retailer_name: str, search_url_template: str, query: str
 
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=HEADLESS, args=BROWSER_ARGS)
+        
+        # 🚀 ปรับ 1: ลดขนาด Viewport เพื่อประหยัด RAM (ใช้ 800x600 ก็พอสำหรับการขูดข้อมูล)
         context = await browser.new_context(
             user_agent=random.choice(USER_AGENTS),
-            viewport={"width": 1366, "height": 768},
+            viewport={"width": 800, "height": 600}, 
             locale="th-TH",
         )
-        await context.route("**/*", lambda route, request: route.abort() if request.resource_type in ["image", "media", "font"] else route.continue_())
+
+        # 🚀 ปรับ 2: บล็อก CSS (stylesheet) และฟอนต์ เพื่อลดภาระ CPU มหาศาล
+        await context.route("**/*", lambda route, request: 
+            route.abort() if request.resource_type in ["image", "media", "font", "stylesheet", "other"] 
+            else route.continue_()
+        )
+        
         page = await context.new_page()
 
         try:
-            try: await page.goto(url, timeout=60000, wait_until="domcontentloaded")
-            except: return []
+            # 🚀 ปรับ 3: ลด Timeout เหลือ 30 วินาที และใช้ domcontentloaded (ไม่ต้องรอให้สคริปต์โฆษณาโหลดเสร็จ)
+            try: 
+                await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+            except: 
+                print(f"⚠️ {retailer_name} timeout/error during goto")
+                return []
 
-            await page.wait_for_timeout(2000)
+            # 🚀 ปรับ 4: รอเพียงสั้นๆ ให้ JavaScript Render ข้อมูลสินค้าออกมา (1-1.5 วินาทีก็พอ)
+            await page.wait_for_timeout(1500) 
+            
             soup = BeautifulSoup(await page.content(), "html.parser")
             cards = soup.select(selector_config["product_card"])
             page_items = []
 
             if cards:
-                for card in cards[:30]:
+                # 🚀 ปรับ 5: ลดจำนวนสินค้าที่ประมวลผลต่อรอบเหลือ 20 เพื่อความเร็วในการคำนวณ
+                for card in cards[:20]:
                     try:
                         name_el = card.select_one(selector_config["name"])
                         if not name_el: continue
@@ -228,7 +244,6 @@ async def scrape_search(retailer_name: str, search_url_template: str, query: str
                         raw_qty = card_text 
                         final_name = clean_product_name(raw_name, price)
                         
-                        # ✅ PASS NAME to normalize for smart unit detection
                         qty, unit, u_price = normalize_unit_data(final_name, raw_qty, price)
 
                         page_items.append({

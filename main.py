@@ -8,7 +8,9 @@ import json
 import cloudinary
 import cloudinary.uploader
 from models import Product 
+
 from grocery_api import CompareRequest , process_single_item
+import asyncio
 
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -358,14 +360,18 @@ def line_add_product(data: schemas.ProductCreate, db: Session = Depends(get_db))
 
 @app.post("/api/compare")
 async def compare_prices(req: CompareRequest):
-    final_results = []
-    for item in req.items:
-        item = (item or "").strip()
-        if not item: continue
-        results = await process_single_item(item)
-        final_results.extend(results)
+    # 1. สร้างรายการงาน (Tasks) โดยใช้ List Comprehension (ตรวจสอบการย่อหน้าบรรทัดนี้)
+    tasks = [process_single_item(item.strip()) for item in req.items if item.strip()]
+    
+    if not tasks:
+        return {"status": "success", "message": "No items to compare", "data": []}
+    
+    # 2. รัน Tasks ทั้งหมดขนานกันโดยใช้ asyncio.gather
+    results_nested = await asyncio.gather(*tasks)
+    
+    # 3. รวมผลลัพธ์ (Flatten List) จาก [[...], [...]] เป็น [...]
+    final_results = [item for sublist in results_nested for item in sublist]
+    
     return {"status": "success", "message": "", "data": final_results}
-# if __name__ == "__main__":
-#     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 
