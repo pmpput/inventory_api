@@ -8,6 +8,7 @@ import json
 import cloudinary
 import cloudinary.uploader
 from models import Product 
+from grocery_api import CompareRequest , process_single_item
 
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -49,6 +50,7 @@ origins = [
     "http://localhost:3000",
     "http://localhost:8000",
     "http://127.0.0.1:8000",
+    "https://inventory-api-659i.onrender.com"
     "*"  # ช่วง dev ใส่ * ง่ายสุด (โปรดล็อกให้แคบลงตอนโปรดักชัน)
 ]
 
@@ -354,5 +356,17 @@ def line_add_product(data: schemas.ProductCreate, db: Session = Depends(get_db))
     db.commit()
     db.refresh(product)
     return {"id": product.id, "name": product.name}    
+
+@app.post("/api/compare")
+async def compare_prices(req: CompareRequest):
+    final_results = []
+    for item in req.items:
+        item = (item or "").strip()
+        if not item: continue
+        results = await process_single_item(item)
+        final_results.extend(results)
+    return {"status": "success", "message": "", "data": final_results}
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
 
 

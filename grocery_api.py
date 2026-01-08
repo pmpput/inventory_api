@@ -11,19 +11,6 @@ from typing import List, Dict
 from fastapi import FastAPI, Request, HTTPException, Header
 from pydantic import BaseModel
 
-# LINE SDK
-# from linebot import LineBotApi, WebhookHandler
-# from linebot.exceptions import InvalidSignatureError
-# from linebot.models import (
-#     MessageEvent, TextMessage, TextSendMessage, FlexSendMessage,
-#     BubbleContainer, BoxComponent, TextComponent, SeparatorComponent
-# )
-
-# 1. Allow nested event loops
-nest_asyncio.apply()
-
-if sys.platform == "win32":
-    asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
 # IMPORT YOUR SCRAPERS
 from retailer_scraper import scrape_search, find_best_deals
@@ -59,7 +46,7 @@ TARGETS = [
     },
 ]
 
-app = FastAPI()
+# app = FastAPI()
 
 class CompareRequest(BaseModel):
     items: List[str]
@@ -279,5 +266,5 @@ async def compare_prices(req: CompareRequest):
         results = await process_single_item(item)
         final_results.extend(results)
     return {"status": "success", "message": "", "data": final_results}
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+# if __name__ == "__main__":
+#     uvicorn.run(app, host="0.0.0.0", port=8000)
