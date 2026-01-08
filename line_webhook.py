@@ -162,7 +162,7 @@ async def line_webhook(
                     ),
                 )
 
-                # ✅ ค่อยยิง API ทีหลัง (ไม่ block LINE)
+                # ✅ ค่อยยิง API ทีหลัง 
                 async with httpx.AsyncClient(timeout=5.0) as client:
                     await client.post(
                         f"{API_BASE}/line/add-product",
