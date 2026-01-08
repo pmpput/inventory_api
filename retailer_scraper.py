@@ -239,6 +239,8 @@ async def scrape_search(retailer_name: str, search_url_template: str, query: str
                         raw_name = clean_text(name_el.get_text(" "))
                         card_text = clean_text(card.get_text(" "))
                         price = extract_price(card_text)
+                        
+                        print(f"DEBUG: Found {raw_name} - Price: {price}")
                         if price <= 4: continue
 
                         raw_qty = card_text 
