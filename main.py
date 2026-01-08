@@ -16,7 +16,7 @@ import re
 import nest_asyncio
 import pandas as pd
 from pydantic import BaseModel
-import uvicorn
+
 
 import firebase_admin
 from firebase_admin import credentials, messaging
@@ -34,8 +34,7 @@ from firebase_utils import send_inventory_notification
 from models import Branch
 from line_webhook import router as line_router
 
-# 1. Allow nested event loops
-nest_asyncio.apply()
+# 1. Allow nested event loop
 
 if sys.platform == "win32":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
@@ -613,5 +612,3 @@ async def compare_prices(req: CompareRequest):
         results = await process_single_item(item)
         final_results.extend(results)
     return {"status": "success", "message": "", "data": final_results}
-if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
