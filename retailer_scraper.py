@@ -2,7 +2,6 @@ import asyncio
 import random
 import re
 from typing import List, Dict, Any
-
 from playwright.async_api import async_playwright
 from bs4 import BeautifulSoup
 
@@ -19,15 +18,17 @@ BROWSER_ARGS = [
     "--disable-dev-shm-usage",
 ]
 
-HEADLESS = True 
+HEADLESS = True
 
+# Helper function to clean and normalize text
 def clean_text(text: str) -> str:
     return re.sub(r"\s+", " ", text).strip() if text else ""
 
+# Helper function to extract prices from text
 def extract_price(text: str) -> float:
     if not text: return 0.0
     t = text.replace(",", "").strip()
-    
+
     # Promo Price First
     promo_patterns = [
         r"(?:promo|promotion|special|ลดเหลือ|เหลือเพียง)\s*฿?\s*(\d+(?:\.\d+)?)",
@@ -55,7 +56,7 @@ def extract_egg_quantity(text: str) -> float:
     if m: return float(m.group(1))
     return 1.0
 
-# ✅ FIXED: Robust Unit Normalizer
+# Function to normalize units of data and clean product names
 def normalize_unit_data(name: str, raw_qty: str, price: float):
     # 1. Clean Duplicate Numbers (Fixes "12 12")
     s = raw_qty.lower()
@@ -72,7 +73,6 @@ def normalize_unit_data(name: str, raw_qty: str, price: float):
         return qty, unit, unit_price
 
     # 3. Standard Unit Logic (Updated Regex for Thai KG)
-    # Added: กก (no dot), กก., kgs, kg.
     unit_regex = r"(kg|kgs|kilo|g|gm|ml|l|liter|pack|packs|pcs|piece|pieces|ขวด|แพ็ค|แพค|ชิ้น|กระป๋อง|กล่อง|กรัม|ก\.|กิโลกรัม|กิโล|กก\.?|ก\.ก\.?|มล\.?|ลิตร|ล\.?)"
 
     qty = 1.0
@@ -95,7 +95,6 @@ def normalize_unit_data(name: str, raw_qty: str, price: float):
         qty = float(m3.group(1))
         unit = m3.group(2)
 
-    # 4. Convert to Base Units (kg, L, pcs)
     final_qty = qty
     final_unit = "pcs"
 
@@ -107,25 +106,12 @@ def normalize_unit_data(name: str, raw_qty: str, price: float):
         final_unit = "L"
     elif any(u in unit for u in ["kg", "kilo", "กิโล", "กก", "l", "liter", "ลิตร", "ล."]):
         final_qty = qty
-        # Detect if it's weight (kg) or volume (L)
         if any(u in unit for u in ["l", "liter", "ลิตร", "ล."]):
             final_unit = "L"
         else:
             final_unit = "kg"
     
-    # ✅ 5. FORCE KG FOR MEAT/FISH (The Big Fix)
-    # If we failed to find a weight unit, BUT the name implies it's sold by weight
-    if final_unit == "pcs":
-        is_fresh_food = any(w in name_lower for w in ["pork", "chicken", "salmon", "fish", "meat", "beef", "หมู", "ไก่", "ปลา", "เนื้อ", "แซลมอน"])
-        has_kg_keyword = any(w in name_lower for w in ["kg", "kilo", "กก", "กิโล", "/kg", "ต่อกก"])
-        
-        if is_fresh_food and has_kg_keyword:
-            final_unit = "kg"
-            final_qty = 1.0 # Assume price is per 1 kg if listed as "Pork ... kg"
-
-    # Avoid division by zero
     if final_qty <= 0: final_qty = 1.0
-    
     u_price = round(price / final_qty, 2)
     return final_qty, final_unit, u_price
 
@@ -165,7 +151,6 @@ def heuristic_scrape(soup: BeautifulSoup, retailer: str) -> List[Dict[str, Any]]
         if price < 5: continue
 
         final_name = clean_product_name(text, price)
-        # Pass NAME to allow smart unit logic
         qty, unit, u_price = normalize_unit_data(final_name, text, price)
 
         products.append({
@@ -185,8 +170,7 @@ async def scrape_search(retailer_name: str, search_url_template: str, query: str
     q_raw = (query or "").strip()
     if not q_raw: return []
     q_encoded = quote(q_raw, safe="")
-    
-    # เลือก URL ตามภาษา
+
     if retailer_name.lower() == "bigc":
         has_thai = any("\u0E00" <= ch <= "\u0E7F" for ch in q_raw)
         url = f"https://www.bigc.co.th/th/search?q={q_encoded}" if has_thai else f"https://www.bigc.co.th/en/search?q={q_encoded}"
@@ -199,14 +183,12 @@ async def scrape_search(retailer_name: str, search_url_template: str, query: str
     async with async_playwright() as p:
         browser = await p.chromium.launch(headless=HEADLESS, args=BROWSER_ARGS)
         
-        # 🚀 ปรับ 1: ลดขนาด Viewport เพื่อประหยัด RAM (ใช้ 800x600 ก็พอสำหรับการขูดข้อมูล)
         context = await browser.new_context(
             user_agent=random.choice(USER_AGENTS),
             viewport={"width": 800, "height": 600}, 
             locale="th-TH",
         )
 
-        # 🚀 ปรับ 2: บล็อก CSS (stylesheet) และฟอนต์ เพื่อลดภาระ CPU มหาศาล
         await context.route("**/*", lambda route, request: 
             route.abort() if request.resource_type in ["image", "media", "font", "stylesheet", "other"] 
             else route.continue_()
@@ -215,49 +197,40 @@ async def scrape_search(retailer_name: str, search_url_template: str, query: str
         page = await context.new_page()
 
         try:
-            # 🚀 ปรับ 3: ลด Timeout เหลือ 30 วินาที และใช้ domcontentloaded (ไม่ต้องรอให้สคริปต์โฆษณาโหลดเสร็จ)
-            try: 
-                await page.goto(url, timeout=30000, wait_until="domcontentloaded")
-            except: 
-                print(f"⚠️ {retailer_name} timeout/error during goto")
-                return []
-
-            # 🚀 ปรับ 4: รอเพียงสั้นๆ ให้ JavaScript Render ข้อมูลสินค้าออกมา (1-1.5 วินาทีก็พอ)
-            await page.wait_for_timeout(1500) 
+            await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+            await page.wait_for_timeout(1500)
             
             soup = BeautifulSoup(await page.content(), "html.parser")
             cards = soup.select(selector_config["product_card"])
             page_items = []
 
-            if cards:
-                # 🚀 ปรับ 5: ลดจำนวนสินค้าที่ประมวลผลต่อรอบเหลือ 20 เพื่อความเร็วในการคำนวณ
-                for card in cards[:20]:
-                    try:
-                        name_el = card.select_one(selector_config["name"])
-                        if not name_el: continue
-                        
-                        raw_name = clean_text(name_el.get_text(" "))
-                        card_text = clean_text(card.get_text(" "))
-                        price = extract_price(card_text)
+            for card in cards[:20]:
+                try:
+                    name_el = card.select_one(selector_config["name"])
+                    if not name_el: continue
+                    raw_name = clean_text(name_el.get_text(" "))
+                    card_text = clean_text(card.get_text(" "))
+                    price = extract_price(card_text)
 
-                        if price <= 4: continue
+                    if price <= 4: continue
 
-                        raw_qty = card_text 
-                        final_name = clean_product_name(raw_name, price)
-                        
-                        qty, unit, u_price = normalize_unit_data(final_name, raw_qty, price)
+                    raw_qty = card_text 
+                    final_name = clean_product_name(raw_name, price)
 
-                        page_items.append({
-                            "WINNER": retailer_name,
-                            "Product Name": final_name,
-                            "Product Type": "",
-                            "Quantity": raw_qty,
-                            "BaseQty": qty,
-                            "BaseUnit": unit,
-                            "Price": price,
-                            "Unit Price": u_price,
-                        })
-                    except: continue
+                    qty, unit, u_price = normalize_unit_data(final_name, raw_qty, price)
+
+                    page_items.append({
+                        "WINNER": retailer_name,
+                        "Product Name": final_name,
+                        "Product Type": "",
+                        "Quantity": raw_qty,
+                        "BaseQty": qty,
+                        "BaseUnit": unit,
+                        "Price": price,
+                        "Unit Price": u_price,
+                    })
+                except Exception as e:
+                    print(f"Error processing card: {e}")
             
             if not page_items:
                 page_items = heuristic_scrape(soup, retailer_name)
@@ -268,6 +241,3 @@ async def scrape_search(retailer_name: str, search_url_template: str, query: str
 
     print(f"✅ {retailer_name} found {len(results)} items")
     return results
-
-def find_best_deals(df):
-    return df

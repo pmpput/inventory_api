@@ -378,6 +378,7 @@ async def compare_prices(req: CompareRequest):
         
         # รวมผลลัพธ์จาก [[...], [...]] เป็น list เดียว [...]
         final_results = [item for sublist in results_nested for item in sublist]
+
         
     except asyncio.TimeoutError:
         return {"status": "error", "message": "Request took too long, please try fewer items."}
@@ -385,5 +386,3 @@ async def compare_prices(req: CompareRequest):
         return {"status": "error", "message": str(e)}
 
     return {"status": "success", "message": "", "data": final_results}
-
-
