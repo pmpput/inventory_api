@@ -8,7 +8,7 @@ import json
 import cloudinary
 import cloudinary.uploader
 from models import Product 
-from grocery_api import CompareRequest , process_single_item
+# from grocery_api import CompareRequest , process_single_item
 import asyncio
 
 import firebase_admin
