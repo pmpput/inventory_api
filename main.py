@@ -363,26 +363,26 @@ async def safe_process(item):
     async with sem:
         return await process_single_item(item)
 
-@app.post("/api/compare")
-async def compare_prices(req: CompareRequest):
-    # สร้างรายการงาน (Tasks)
-    tasks = [safe_process(item.strip()) for item in req.items if item.strip()]
+# @app.post("/api/compare")
+# async def compare_prices(req: CompareRequest):
+#     # สร้างรายการงาน (Tasks)
+#     tasks = [safe_process(item.strip()) for item in req.items if item.strip()]
     
-    if not tasks:
-        return {"status": "success", "data": []}
+#     if not tasks:
+#         return {"status": "success", "data": []}
 
-    try:
-        # ใช้ asyncio.wait_for เพื่อป้องกันค้างเกิน 50 วินาที
-        # หากเกินเวลา ระบบจะตัดการทำงานและคืนค่าเท่าที่หาได้
-        results_nested = await asyncio.wait_for(asyncio.gather(*tasks), timeout=55.0)
+#     try:
+#         # ใช้ asyncio.wait_for เพื่อป้องกันค้างเกิน 50 วินาที
+#         # หากเกินเวลา ระบบจะตัดการทำงานและคืนค่าเท่าที่หาได้
+#         results_nested = await asyncio.wait_for(asyncio.gather(*tasks), timeout=55.0)
         
-        # รวมผลลัพธ์จาก [[...], [...]] เป็น list เดียว [...]
-        final_results = [item for sublist in results_nested for item in sublist]
+#         # รวมผลลัพธ์จาก [[...], [...]] เป็น list เดียว [...]
+#         final_results = [item for sublist in results_nested for item in sublist]
 
         
-    except asyncio.TimeoutError:
-        return {"status": "error", "message": "Request took too long, please try fewer items."}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+#     except asyncio.TimeoutError:
+#         return {"status": "error", "message": "Request took too long, please try fewer items."}
+#     except Exception as e:
+#         return {"status": "error", "message": str(e)}
 
-    return {"status": "success", "message": "", "data": final_results}
+#     return {"status": "success", "message": "", "data": final_results}

@@ -11,10 +11,10 @@ pydantic
 alembic
 cloudinary
 line-bot-sdk
-pandas
-scikit-learn
-playwright
-beautifulsoup4
-nest-asyncio
+# pandas
+# scikit-learn
+# playwright
+# beautifulsoup4
+# nest-asyncio
 
 
