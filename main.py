@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from typing import List , Dict
 import os, shutil
 import json
+from dotenv import load_dotenv
 import cloudinary
 import cloudinary.uploader
 from models import Product 
@@ -29,11 +30,13 @@ from line_webhook import router as line_router
 
 # ----- สร้างตารางเมื่อรันครั้งแรก (ถ้ายังไม่มี) -----
 # Base.metadata.create_all(bind=engine)
-
+load_dotenv()
 app = FastAPI(title="Inventory API")
 
 cloudinary.config(
-    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME")
+    cloud_name = os.getenv("CLOUDINARY_CLOUD_NAME"),
+    api_key=os.getenv("CLOUDINARY_API_KEY"),
+    api_secret=os.getenv("CLOUDINARY_API_SECRET")
 )
 router = APIRouter(prefix="/branches", tags=["Branches"])
 app.include_router(auth_router)  # << เพิ่มบรรทัดนี้
